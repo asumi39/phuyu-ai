@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定義 AI 助理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            800: '#202123',
+                            900: '#343541',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 隱藏捲軸但保留滾動功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-800 text-gray-100 h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-gray-900 flex-shrink-0 flex flex-col hidden md:flex">
+        <div class="p-4">
+            <button class="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-white py-2 px-4 rounded-md border border-gray-600 transition-colors">
+                <i data-lucide="plus" class="w-4 h-4"></i> 新對話
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 no-scrollbar">
+            <p class="text-xs text-gray-400 mb-2">今天</p>
+            <div class="p-2 hover:bg-gray-800 rounded cursor-pointer text-sm truncate">探索 DeepSeek 潛力...</div>
+        </div>
+        <div class="p-4 border-t border-gray-700">
+            <button onclick="toggleSettings()" class="w-full flex items-center gap-3 p-2 hover:bg-gray-800 rounded transition-colors text-sm">
+                <i data-lucide="settings" class="w-4 h-4"></i> API 設定
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative h-full">
+        <header class="h-14 flex items-center justify-between px-4 border-b border-gray-700 md:hidden bg-gray-800 z-10">
+            <span class="font-semibold">AI 助理</span>
+            <button onclick="toggleSettings()"><i data-lucide="settings" class="w-5 h-5"></i></button>
+        </header>
+
+        <div id="chatBox" class="flex-1 overflow-y-auto p-4 space-y-6 pb-32 no-scrollbar">
+            <div class="flex max-w-3xl mx-auto gap-4">
+                <div class="w-8 h-8 rounded-sm bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="bot" class="w-5 h-5 text-white"></i>
+                </div>
+                <div class="mt-1">
+                    <p class="text-gray-100">你好！我是你的 AI 助理。請先點擊左下角「API 設定」配置你的端點與金鑰。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-gray-800 via-gray-800 to-transparent pt-6 pb-6 px-4">
+            <div class="max-w-3xl mx-auto relative">
+                <textarea id="userInput" rows="1" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none overflow-hidden" placeholder="輸入訊息..." oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'"></textarea>
+                <button onclick="sendMessage()" class="absolute right-3 bottom-3 p-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="text-center mt-2 text-xs text-gray-400">
+                AI 可能會犯錯，請核實重要資訊。
+            </div>
+        </div>
+    </main>
+
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 w-full max-w-md rounded-xl shadow-2xl border border-gray-700 p-6 m-4">
+            <h2 class="text-xl font-semibold mb-4 flex items-center justify-between">
+                自定義 API 設定
+                <button onclick="toggleSettings()" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </h2>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-gray-300 mb-1">API Base URL</label>
+                    <input type="text" id="apiUrl" class="w-full bg-gray-900 border border-gray-600 rounded p-2 focus:outline-none focus:border-blue-500" placeholder="例如: https://api.deepseek.com/v1">
+                </div>
+                <div>
+                    <label class="block text-gray-300 mb-1">API Key</label>
+                    <input type="password" id="apiKey" class="w-full bg-gray-900 border border-gray-600 rounded p-2 focus:outline-none focus:border-blue-500" placeholder="sk-...">
+                </div>
+                <div>
+                    <label class="block text-gray-300 mb-1">模型名稱 (Model)</label>
+                    <input type="text" id="modelName" class="w-full bg-gray-900 border border-gray-600 rounded p-2 focus:outline-none focus:border-blue-500" placeholder="例如: deepseek-chat" value="deepseek-chat">
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button onclick="toggleSettings()" class="px-4 py-2 rounded text-gray-300 hover:bg-gray-700">取消</button>
+                <button onclick="saveSettings()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 Icons
+        lucide.createIcons();
+
+        // 載入時從 localStorage 讀取設定
+        window.onload = () => {
+            document.getElementById('apiUrl').value = localStorage.getItem('apiUrl') || '';
+            document.getElementById('apiKey').value = localStorage.getItem('apiKey') || '';
+            document.getElementById('modelName').value = localStorage.getItem('modelName') || 'deepseek-chat';
+        };
+
+        // 開關設定彈窗
+        function toggleSettings() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.toggle('hidden');
+            modal.classList.toggle('flex');
+        }
+
+        // 儲存設定到 localStorage
+        function saveSettings() {
+            localStorage.setItem('apiUrl', document.getElementById('apiUrl').value);
+            localStorage.setItem('apiKey', document.getElementById('apiKey').value);
+            localStorage.setItem('modelName', document.getElementById('modelName').value);
+            toggleSettings();
+            alert('設定已儲存！');
+        }
+
+        // 發送訊息 (目前僅作 UI 演示)
+        function sendMessage() {
+            const input = document.getElementById('userInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const chatBox = document.getElementById('chatBox');
+
+            // 1. 添加使用者訊息到 UI
+            const userMsgHtml = `
+                <div class="flex max-w-3xl mx-auto gap-4 flex-row-reverse">
+                    <div class="w-8 h-8 rounded-sm bg-gray-600 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="user" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <div class="mt-1 bg-gray-700 py-2 px-4 rounded-2xl rounded-tr-sm text-gray-100 max-w-[80%]">
+                        ${text.replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+            `;
+            chatBox.insertAdjacentHTML('beforeend', userMsgHtml);
+            input.value = '';
+            input.style.height = 'auto'; // 重置高度
+            lucide.createIcons();
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 2. 模擬 AI 回覆 (這裡之後會接上你的 API 中間件)
+            setTimeout(() => {
+                const aiMsgHtml = `
+                    <div class="flex max-w-3xl mx-auto gap-4">
+                        <div class="w-8 h-8 rounded-sm bg-blue-600 flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="bot" class="w-5 h-5 text-white"></i>
+                        </div>
+                        <div class="mt-1 text-gray-100">
+                            <p>這是一條測試回覆。你的前端 UI 已經準備好了！下一步我們可以開始串接 API 中間件。</p>
+                        </div>
+                    </div>
+                `;
+                chatBox.insertAdjacentHTML('beforeend', aiMsgHtml);
+                lucide.createIcons();
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 600);
+        }
+
+        // 支援 Enter 發送 (Shift+Enter 換行)
+        document.getElementById('userInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
